@@ -1,126 +1,85 @@
 #!flask/bin/python
 import os, requests, sys
-from flask import Flask, request, redirect, url_for
+from flask import Flask, request, redirect, url_for, jsonify
 from werkzeug.utils import secure_filename
-from io import BytesIO
 
 import pandas as pd
-from sklearn import linear_model
 import pickle
-from PIL import Image, ImageOps
+from PIL import ImageOps
+
+import base64
+import numpy as np
+import io
+from PIL import Image
+import keras
+from keras import backend as K
+from keras.models import Sequential
+from keras.models import load_model
+from keras.preprocessing.image import ImageDataGenerator
+from keras.preprocessing.image import img_to_array
+
 
 app = Flask(__name__)
 
-def process_image(image_url):
-    
-    response = requests.get(image_url)
-    im = Image.open(BytesIO(response.content))    
+def get_model():
+    global model
+    model = pickle.load(open('/app/team6_challenge3_rfc.pkl', 'rb'))
+    print("Model loaded!", file=sys.stderr)
+
+
+
+
+def process_image_file(im):
+    print("Processing image file...", file=sys.stderr)
     desired_size = 128
-    
     old_size = im.size
-    
     ratio = float(desired_size)/max(old_size)
     new_size = tuple([int(x*ratio) for x in old_size])
- 
+
     im = im.resize(new_size, Image.ANTIALIAS)
- 
     new_im = Image.new("RGB", (desired_size, desired_size), (255,255,255))
     new_im.paste(im, ((desired_size-new_size[0])//2,
                     (desired_size-new_size[1])//2))
     
     #new_im = ImageOps.autocontrast(new_im, cutoff=0)
     new_im = ImageOps.equalize(new_im)
-    
-    new_im = [np.ravel(img)]
+    new_im = [np.ravel(new_im)]
+
+    print("Processing image file completed", file=sys.stderr)
 
     return new_im
 
-def process_image_file(file):
-    
-    img = file.read()
-    img_io = BytesIO(img)
-    im = Image.open(img_io)
-    print('loaded image', file=sys.stderr)
-    desired_size = 128
-    
-    old_size = im.size
-    
-    ratio = float(desired_size)/max(old_size)
-    new_size = tuple([int(x*ratio) for x in old_size])
- 
-    im = im.resize(new_size, Image.ANTIALIAS)
- 
-    new_im = Image.new("RGB", (desired_size, desired_size), (255,255,255))
-    new_im.paste(im, ((desired_size-new_size[0])//2,
-                    (desired_size-new_size[1])//2))
-    
-    #new_im = ImageOps.autocontrast(new_im, cutoff=0)
-    new_im = ImageOps.equalize(new_im)
-    
-    new_im = [np.ravel(img)]
-
-    return new_im
+print("Loading sci-kit learn model...", file=sys.stderr)
+get_model()
 
 
-@app.route('/isAlive')
-def index():
-    return "true"
 
-@app.route('/prediction/api/v1.0/score', methods=['GET'])
-def get_prediction():
-
-    image_url = request.args.get('image_url')
-    print('request.args.get', file=sys.stderr)
-
-    loaded_model = pickle.load(open('/app/team6_challenge3_rfc.pkl', 'rb'))
-    print('loaded pickle', file=sys.stderr)
-
-    img = process_image (image_url)
-    prediction = loaded_model.predict(img)
-
-    return str(test_pred)
-
-@app.route('/prediction/api/v1.0/test', methods=['GET'])
+@app.route('/test', methods=['GET'])
 def get_test():
-
     return str("it works!")
 
 
-@app.route('/prediction/api/v1.0/gear', methods=['GET', 'POST'])
+@app.route('/testpost', methods=['POST'])
+def get_testpost():
+
+    return str("POST works too!")
+
+
+@app.route('/predict', methods=['POST'])
 def upload_file():
-    if request.method == 'POST':
-        # try:
-        # check if the post request has the file part
+    print("Processing json request...", file=sys.stderr)
+    message = request.get_json(force=True)
+    encoded = message['image']
+    decoded = base64.b64decode(encoded)
+    image = Image.open(io.BytesIO(decoded))
+    im = process_image_file(image)
+    print("Processing json request completed", file=sys.stderr)
 
-        # if 'file' not in request.files:
-        #     flash('No file part')
-        #     return redirect(request.url)
+    print("Predicting image class...", file=sys.stderr)        
+    prediction = model.predict(im)
+    print("Predicting image class completed", file=sys.stderr)
 
-        file = request.files['file']
-
-        print('url is ' + file, file=sys.stderr)
-
-        im = process_image_file(file)
-
-        # if user does not select file, browser also
-        # submit an empty part without filename
-        # if file.filename == '':
-        #     flash('No selected file')
-        #     return redirect(request.url)
-
-        #return str("It also works!")
-
-        #if file and allowed_file(file.filename):
-        loaded_model = pickle.load(open('team6_challenge3_rfc.pkl', 'rb'))
-        prediction = loaded_model.predict(im)
-
-        #last_prediction = prediction
-
-        #except requests.exceptions.RequestException as e:
-        return str(prediction)
-
-    if request.method == 'GET':
-        return last_prediction
+    return str(prediction)
 
 
 @app.errorhandler(500)

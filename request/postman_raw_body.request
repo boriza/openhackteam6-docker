@@ -1,0 +1,16 @@
+{
+    "image": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABAQMAAAAl21bKAAAAA1BMVEUAAACnej3aAAAAAXRSTlMAQObYZgAAAApJREFUCNdjYAAAAAIAAeIhvDMAAAAASUVORK5CYII="
+}
+
+
+(echo -n '{"image": "'; base64 ./test-image-carabiner.jpeg; echo '"}') |
+curl -H "Content-Type: application/json" -d @-  http://localhost:5000/predict
+
+
+(echo -n '{"image": "'; base64 ./tent.jpg; echo '"}') |
+curl -H "Content-Type: application/json" -d @-  http:/ohgear.azurewebsites.net/predict
+
+
+(echo -n '{"image": "'; base64 ./test-image-jacket.jpeg; echo '"}') |
+curl -H "Content-Type: application/json" -d @-  http:/ohgear.azurewebsites.net/predict
+
